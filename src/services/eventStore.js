@@ -14,9 +14,8 @@ export const EventStore = {
    */
   async append(event) {
     // 1. Write to local log
-    const logs = useStore.getState().logs
-    logs.unshift(event)
-    useStore.getState().setLogs(logs)
+    const newLogs = [event, ...logs]
+    useStore.getState().setLogs(newLogs)
 
     // 2. Apply to local state
     useStore.getState().processEvent(event)
