@@ -4,7 +4,6 @@ import { tcp } from '@libp2p/tcp'
 import { mplex } from '@libp2p/mplex'
 import { gossipsub } from '@libp2p/gossipsub'
 import { bootstrap } from '@libp2p/bootstrap'
-import { mdns } from '@libp2p/mdns'
 
 const PUBSUB_TOPIC = '/coffepeer/v1/event'
 
@@ -27,7 +26,7 @@ export const PubSubService = {
     const libp2pNode = await createLibp2p({
       transports: [tcp()],
       connectionMultiplexers: [mplex()],
-      peerDiscovery: [bootstrap({ list: BOOTSTRAP_NODES }), mdns()],
+      peerDiscovery: [bootstrap({ list: BOOTSTRAP_NODES })],
       services: {
         pubsub: gossipsub({ warnOnLargeMessage: true }),
       },
