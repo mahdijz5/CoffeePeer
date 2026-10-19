@@ -1,46 +1,31 @@
-import { PubSubService } from './pubsub.js'
-import { makeCreatedEvent, makeUpdatedEvent, makeSoldEvent } from '../types/events.js'
+import { makeCreatedEvent, makeUpdatedEvent, makeRestockedEvent, makeSoldEvent, generateId } from '../types/events.js'
 import { useStore } from '../store/index.js'
+import { getConfig, sync } from './githubSync.js'
 
 /**
- * EventStore manages the append log and forwards new events to peers via PubSub.
- * It is stateless about data — items are kept in Zustand store.
+ * EventStore stamps new events, appends them to the local log (Zustand,
+ * persisted) and kicks off a GitHub sync. Always succeeds locally.
  */
 export const EventStore = {
-  /**
-   * Append an event to the local log and broadcast to swarm.
-   * Always succeeds — no buffering, no rejection.
-   * @param {{ op: string, data: any, timestamp: number }} event
-   */
-  async append(event) {
-    // 1. Write to local log
-    const newLogs = [event, ...logs]
-    useStore.getState().setLogs(newLogs)
-
-    // 2. Apply to local state
-    useStore.getState().processEvent(event)
-
-    // 3. Broadcast to peers (non-blocking — PubSub handles retries)
-    PubSubService.broadcast(event)
+  /** @param {{ op: string, data: any, timestamp: number }} event */
+  append(event) {
+    useStore.getState().addEvents([{ ...event, id: generateId(), device: getConfig()?.deviceId }])
+    sync() // fire and forget: failures show in the sync status, event stays pending
   },
 
-  async addItem(item) {
-    await this.append(makeCreatedEvent(item))
+  addItem(item) {
+    this.append(makeCreatedEvent(item))
   },
 
-  async updateItem(updates) {
-    await this.append(makeUpdatedEvent(updates))
+  updateItem(updates) {
+    this.append(makeUpdatedEvent(updates))
   },
 
-  async sellItem(itemId, quantity = 1) {
-    await this.append(makeSoldEvent({ itemId, quantity }))
+  restockItem(itemId, quantity = 1) {
+    this.append(makeRestockedEvent({ itemId, quantity }))
   },
 
-  /**
-   * Subscribe to incoming events (from PubSub, not own appends).
-   * @param {(event: any) => void} cb
-   */
-  onEvent(cb) {
-    PubSubService.on('events', cb)
+  sellItem(itemId, quantity = 1) {
+    this.append(makeSoldEvent({ itemId, quantity }))
   },
 }

@@ -4,11 +4,7 @@ import { EventStore } from '../services/eventStore.js'
 export default function ItemList() {
   const items = useStore((s) => s.items)
 
-  const addItem = (id) => {
-    const current = items[id]
-    if (!current) return
-    EventStore.updateItem({ id, stock: current.stock + 1 })
-  }
+  const addItem = (id) => EventStore.restockItem(id)
 
   const updatePrice = (id) => {
     const current = items[id]

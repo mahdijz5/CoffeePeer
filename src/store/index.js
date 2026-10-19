@@ -1,79 +1,41 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import { replay } from '../lib/reduce.js'
 
 /**
- * Zustand store: single source of truth for all item state.
- * The reducer processes domain events and applies them locally.
- * PubSub delivers events from peers into processEvent.
+ * Zustand store. `logs` (persisted) is the source of truth; `items` is derived
+ * from it by replay. `pushed` = ids of own events already written to GitHub.
  */
-export const useStore = create((set, get) => ({
-  items: {},       // { [id]: { id, title, price, stock } }
-  logs: [],        // [event, event, ...] — append-only log
+export const useStore = create(
+  persist(
+    (set) => ({
+      items: {},   // { [id]: { id, title, price, stock } }
+      logs: [],    // every known event, local and pulled
+      pushed: [],  // ids of own events already in the data repo
 
-  setItems(items) {
-    set({ items })
-  },
-
-  setLogs(logs) {
-    set({ logs })
-  },
-
-  addItem(item) {
-    set((state) => ({
-      items: { ...state.items, [item.id]: item },
-    }))
-  },
-
-  processEvent(event) {
-    const { data } = event
-    // data is always an array — take first element
-    const payload = data[0] || {}
-
-    switch (event.op) {
-      case 'item.created': {
-        const item = {
-          id: payload.id || String(Date.now()),
-          title: payload.title || 'Unnamed',
-          price: Number(payload.price) || 0,
-          stock: 0,
-        }
-        set((state) => ({
-          items: { ...state.items, [item.id]: item },
-        }))
-        break
-      }
-
-      case 'item.updated': {
+      // ponytail: full replay per change, fine for shop volume; memoise/snapshot if logs get huge.
+      addEvents(events) {
         set((state) => {
-          const existing = state.items[payload.id]
-          if (!existing) return state
-          return {
-            items: {
-              ...state.items,
-              [payload.id]: { ...existing, ...payload },
-            },
-          }
+          const known = new Set(state.logs.map((e) => e.id))
+          const fresh = events.filter((e) => !known.has(e.id))
+          if (!fresh.length) return state
+          const logs = [...state.logs, ...fresh]
+          return { logs, items: replay(logs) }
         })
-        break
-      }
+      },
 
-      case 'item.sold': {
-        set((state) => {
-          const existing = state.items[payload.itemId]
-          if (!existing) return state
-          const newStock = Math.max(0, existing.stock - payload.quantity)
-          return {
-            items: {
-              ...state.items,
-              [payload.itemId]: { ...existing, stock: newStock },
-            },
-          }
-        })
-        break
-      }
-    }
-  },
-
-  getItem(id) {
-    return get().items[id]
-  },
-}))
+      markPushed(ids) {
+        set((state) => ({ pushed: [...state.pushed, ...ids] }))
+      },
+    }),
+    {
+      name: 'coffeepeer-store',
+      partialize: ({ logs, pushed }) => ({ logs, pushed }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...persisted,
+        items: replay(persisted?.logs || []),
+      }),
+    },
+  ),
+)

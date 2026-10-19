@@ -1,33 +1,26 @@
 import { useEffect, useState } from 'react'
-import PeerStatus from './components/PeerStatus'
+import SyncStatus from './components/SyncStatus'
 import ItemList from './components/ItemList'
 import ItemForm from './components/ItemForm'
-import { PubSubService } from './services/pubsub'
-import { EventStore } from './services/eventStore'
+import Setup from './components/Setup'
+import { getConfig, startSync } from './services/githubSync'
 
 function App() {
-  const [_showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [configured, setConfigured] = useState(() => !!getConfig())
 
-  useEffect(() => {
-    PubSubService.init()
-    EventStore.onEvent((event) => {
-      // Incoming event from another peer — apply to store
-      // The store's processEvent is called inside EventStore.append,
-      // so we just need to call it here for remote events
-      import('./store/index.js').then(({ useStore }) => {
-        useStore.getState().processEvent(event)
-      })
-    })
-  }, [])
+  useEffect(() => (configured ? startSync() : undefined), [configured])
+
+  if (!configured) return <main><h1>CoffeePeer</h1><Setup onDone={() => setConfigured(true)} /></main>
 
   return (
     <main>
-      <PeerStatus />
+      <SyncStatus />
       <h1>CoffeePeer</h1>
       <button onClick={() => setShowForm(!showForm)}>
-        {_showForm ? 'Hide Form' : 'Add Item'}
+        {showForm ? 'Hide Form' : 'Add Item'}
       </button>
-      {_showForm && <ItemForm onClose={() => setShowForm(false)} />}
+      {showForm && <ItemForm onClose={() => setShowForm(false)} />}
       <ItemList />
     </main>
   )
