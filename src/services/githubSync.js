@@ -40,8 +40,14 @@ export async function saveConfig({ repo, token }) {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
   if (!res.ok) throw new Error(`GitHub ${res.status}: check repo name and token`)
-  const deviceId = getConfig()?.deviceId || crypto.randomUUID()
-  localStorage.setItem(CFG_KEY, JSON.stringify({ repo, token, deviceId }))
+  if (!(await res.json()).private) throw new Error('That repo is public, so everyone could read your sales data. Use a private repo.')
+  const prev = getConfig()
+  if (prev?.repo !== repo) {
+    // new data repo: re-push own events there and forget the old repo's file shas
+    useStore.setState({ pushed: [] })
+    localStorage.removeItem(SHA_KEY)
+  }
+  localStorage.setItem(CFG_KEY, JSON.stringify({ repo, token, deviceId: prev?.deviceId || crypto.randomUUID() }))
 }
 
 const b64dec = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g, '')), (c) => c.charCodeAt(0)))
@@ -56,9 +62,14 @@ async function pushMonth(path, events) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const cur = await gh(`/contents/${path}`)
     if (cur.status !== 404 && !cur.ok) throw new Error(`GitHub ${cur.status} reading ${path}`)
-    // ponytail: Contents API returns content only up to 1MB; monthly per-device file is far below. Switch to blobs API if not.
     const file = cur.ok ? await cur.json() : null
-    const text = file ? b64dec(file.content) : ''
+    let text = file?.content ? b64dec(file.content) : ''
+    if (file && !text && file.size) {
+      // Contents API omits inline content above 1MB (icons make big files likelier): read it raw
+      const raw = await gh(`/contents/${path}`, { raw: true })
+      if (!raw.ok) throw new Error(`GitHub ${raw.status} reading ${path}`)
+      text = await raw.text()
+    }
     const have = new Set(parseLines(text).map((e) => e.id))
     const add = events.filter((e) => !have.has(e.id))
     if (add.length) {

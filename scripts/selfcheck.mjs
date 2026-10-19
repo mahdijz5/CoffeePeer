@@ -25,4 +25,9 @@ assert.equal(replay(prices).latte.price, 6)
 // events for unknown items are ignored, not crashes
 assert.deepEqual(replay([ev('x', 'A', 1, 'item.sold', { itemId: 'ghost', quantity: 1 })]), {})
 
+// icon: set on create, replaced by update; items without one get ''
+const withIcon = [ev('i1', 'A', 1, 'item.created', { id: 'mocha', title: 'Mocha', price: 5, stock: 1, icon: 'data:a' }), ev('i2', 'B', 2, 'item.updated', { id: 'mocha', icon: 'data:b' })]
+assert.equal(replay(withIcon).mocha.icon, 'data:b')
+assert.equal(replay([created]).latte.icon, '')
+
 console.log('selfcheck ok')

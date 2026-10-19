@@ -8,21 +8,27 @@ import { getConfig, startSync } from './services/githubSync'
 function App() {
   const [showForm, setShowForm] = useState(false)
   const [configured, setConfigured] = useState(() => !!getConfig())
+  const [editing, setEditing] = useState(false) // reopen Setup to change repo/token
 
-  useEffect(() => (configured ? startSync() : undefined), [configured])
-
-  if (!configured) return <main><h1>CoffeePeer</h1><Setup onDone={() => setConfigured(true)} /></main>
+  useEffect(() => (configured && !editing ? startSync() : undefined), [configured, editing])
 
   return (
-    <main>
-      <SyncStatus />
-      <h1>CoffeePeer</h1>
-      <button onClick={() => setShowForm(!showForm)}>
-        {showForm ? 'Hide Form' : 'Add Item'}
-      </button>
-      {showForm && <ItemForm onClose={() => setShowForm(false)} />}
-      <ItemList />
-    </main>
+    <>
+      <div className="bg" aria-hidden="true"><i /><i /><i /></div>
+      {!configured || editing ? (
+        <Setup
+          onDone={() => { setConfigured(true); setEditing(false) }}
+          onCancel={configured ? () => setEditing(false) : undefined}
+        />
+      ) : (
+        <main className="app">
+          <SyncStatus onSettings={() => setEditing(true)} />
+          <ItemList onAdd={() => setShowForm(true)} />
+          <button className="fab" onClick={() => setShowForm(true)} aria-label="Add item">+</button>
+          {showForm && <ItemForm onClose={() => setShowForm(false)} />}
+        </main>
+      )}
+    </>
   )
 }
 

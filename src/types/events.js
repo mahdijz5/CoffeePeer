@@ -12,20 +12,20 @@ function generateId() {
 }
 
 /**
- * @typedef {{ id: string, title: string, price: number, stock: number }} Item
+ * @typedef {{ id: string, title: string, price: number, stock: number, icon: string }} Item  icon = data URL or ''
  * @typedef {{ id: string, device: string, op: string, data: object[], timestamp: number }} DomainEvent
  */
 
-/** @param {{ id?: string, title: string, price: number, stock?: number }} item */
+/** @param {{ id?: string, title: string, price: number, stock?: number, icon?: string }} item */
 function makeCreatedEvent(item) {
   return {
     op: Events.ITEM_CREATED,
-    data: [{ id: item.id || generateId(), title: item.title, price: item.price, stock: item.stock || 0 }],
+    data: [{ id: item.id || generateId(), title: item.title, price: item.price, stock: item.stock || 0, ...(item.icon && { icon: item.icon }) }],
     timestamp: Date.now(),
   }
 }
 
-/** @param {{ id: string, title?: string, price?: number }} updates */
+/** @param {{ id: string, title?: string, price?: number, icon?: string }} updates */
 function makeUpdatedEvent(updates) {
   return {
     op: Events.ITEM_UPDATED,

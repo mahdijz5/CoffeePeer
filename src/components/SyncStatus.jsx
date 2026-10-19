@@ -1,9 +1,8 @@
 import { useStore } from '../store/index.js'
 import { useSync, getConfig, sync } from '../services/githubSync.js'
+import Logo from './Logo.jsx'
 
-const COLORS = { idle: '#22c55e', syncing: '#eab308', error: '#ef4444' }
-
-export default function SyncStatus() {
+export default function SyncStatus({ onSettings }) {
   const { status, lastSynced, error } = useSync()
   const pending = useStore((s) => {
     const done = new Set(s.pushed)
@@ -12,17 +11,23 @@ export default function SyncStatus() {
   })
 
   const label =
-    status === 'syncing' ? 'Syncing...'
+    status === 'syncing' ? 'Syncing…'
     : status === 'error' ? `Sync failed: ${error}`
-    : lastSynced ? `Synced ${new Date(lastSynced).toLocaleTimeString()}`
+    : lastSynced ? `Synced ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : 'Not synced yet'
+  const text = `${label}${pending > 0 ? ` · ${pending} pending` : ''}`
 
   return (
-    <header>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: COLORS[status] }} />
-        <span>{label}{pending > 0 && ` · ${pending} pending`}</span>
-        <button onClick={sync} disabled={status === 'syncing'}>Sync now</button>
+    <header className="topbar">
+      <div className="brand">
+        <Logo />
+        <h1>CoffeePeer</h1>
+      </div>
+      <div className="pill" data-status={status} title={text}>
+        <span className="dot" />
+        <span className="pill-text">{text}</span>
+        <button className={`icon-btn ${status === 'syncing' ? 'spin' : ''}`} onClick={sync} disabled={status === 'syncing'} title="Sync now" aria-label="Sync now">⟳</button>
+        <button className="icon-btn" onClick={onSettings} title="Settings" aria-label="Settings">⚙</button>
       </div>
     </header>
   )

@@ -15,12 +15,13 @@ export function replay(events) {
     const p = data[0] || {}
     switch (op) {
       case 'item.created':
-        items[p.id] = { id: p.id, title: p.title || 'Unnamed', price: Number(p.price) || 0, stock: Number(p.stock) || 0 }
+        items[p.id] = { id: p.id, title: p.title || 'Unnamed', price: Number(p.price) || 0, stock: Number(p.stock) || 0, icon: p.icon || '' }
         break
       case 'item.updated': {
         const it = items[p.id]
         if (!it) break
         if (p.title !== undefined) it.title = p.title
+        if (p.icon !== undefined) it.icon = p.icon
         if (p.price !== undefined) it.price = Number(p.price) || 0
         break
       }
