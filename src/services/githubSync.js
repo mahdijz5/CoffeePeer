@@ -21,11 +21,12 @@ const read = (key, fallback) => {
 /** @returns {{ repo: string, token: string, deviceId: string } | null} */
 export const getConfig = () => read(CFG_KEY, null)
 
+// GETs carry a throwaway query param to dodge the browser's 60s cache of API responses.
+// Not `cache: 'no-store'`: that adds Cache-Control/Pragma headers, which GitHub's CORS preflight rejects.
 const gh = (path, { method = 'GET', body, raw = false } = {}) =>
-  fetch(`${API}/repos/${getConfig().repo}${path}`, {
+  fetch(`${API}/repos/${getConfig().repo}${path}${method === 'GET' ? `?_=${Date.now()}` : ''}`, {
     method,
     body: body && JSON.stringify(body),
-    cache: 'no-store',
     headers: {
       Authorization: `Bearer ${getConfig().token}`,
       Accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
@@ -34,6 +35,7 @@ const gh = (path, { method = 'GET', body, raw = false } = {}) =>
 
 /** Validate repo + token, then store them. Keeps the deviceId across re-setup. */
 export async function saveConfig({ repo, token }) {
+  repo = repo.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/+$/, '') // accept pasted URLs
   const res = await fetch(`${API}/repos/${repo}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
