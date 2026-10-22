@@ -3,7 +3,7 @@ import { normName } from './format.js'
 const n = (v) => Number(v) || 0
 
 /**
- * Pure reducer: merged event log -> { items, sales, customers, debts }.
+ * Pure reducer: merged event log -> { items, sales, customers, debts, expenses, expenseTitles }.
  * Dedupes by event id and orders by (timestamp, device, id) so every device derives the same state.
  * Stock is a sum of deltas, so concurrent offline edits always add up.
  *
@@ -26,7 +26,12 @@ const n = (v) => Number(v) || 0
  * order (a wrong phone clock) can't orphan them; voiding a sale/debt/payment removes it. Debtors with
  * no sales still count as customers.
  *
- * @returns {{ items: Record<string, object>, sales: object[], customers: object[], debts: object[] }}
+ * General costs (expense.added: title, amount, note) are listed in expenses; expenseTitles remembers each
+ * distinct title (matched by normalized name, latest spelling) for the dropdown. Voiding an expense removes it
+ * and, if it was the only one, that title.
+ *
+ * @returns {{ items: Record<string, object>, sales: object[], customers: object[], debts: object[],
+ *   expenses: object[], expenseTitles: object[] }}
  */
 export function replay(events) {
   const byId = new Map()
@@ -40,6 +45,7 @@ export function replay(events) {
   const sales = []
   const debts = []
   const payments = []
+  const expenses = []
 
   for (const { id: eid, op, data, timestamp: ts } of sorted) {
     const p = data[0] || {}
@@ -112,6 +118,13 @@ export function replay(events) {
         debts.push({ id: eid, kind: 'manual', ts, customer, title: '', qty: 0, note: String(p.note || '').trim(), total: amount, paidAtSale: 0 })
         break
       }
+      case 'expense.added': {
+        const title = String(p.title || '').trim()
+        const amount = n(p.amount)
+        if (voided.has(eid) || !title || amount <= 0) break
+        expenses.push({ id: eid, ts, title, amount, note: String(p.note || '').trim() })
+        break
+      }
       case 'debt.paid':
         if (!voided.has(eid) && n(p.amount) > 0) payments.push({ id: eid, ts, debtId: p.debtId, amount: n(p.amount), note: String(p.note || '').trim() })
         break
@@ -151,5 +164,17 @@ export function replay(events) {
   }
   const customers = [...byCustomer.values()].sort((a, b) => b.lastTs - a.lastTs)
 
-  return { items, sales, customers, debts }
+  // remembered expense titles: one per normalized title, latest spelling, with usage totals
+  const byTitle = new Map()
+  for (const e of expenses) {
+    const key = normName(e.title)
+    const t = byTitle.get(key) || { key, name: e.title, count: 0, total: 0, lastTs: 0 }
+    t.count += 1
+    t.total += e.amount
+    if (e.ts >= t.lastTs) { t.lastTs = e.ts; t.name = e.title }
+    byTitle.set(key, t)
+  }
+  const expenseTitles = [...byTitle.values()].sort((a, b) => b.lastTs - a.lastTs)
+
+  return { items, sales, customers, debts, expenses, expenseTitles }
 }

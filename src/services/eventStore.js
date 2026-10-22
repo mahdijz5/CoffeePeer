@@ -1,4 +1,4 @@
-import { makeCreatedEvent, makeUpdatedEvent, makeRestockedEvent, makeSoldEvent, makeRemovedEvent, makeVoidedEvent, makeCustomerRenamedEvent, makeCustomerRemovedEvent, makeDebtAddedEvent, makeDebtPaidEvent, generateId } from '../types/events.js'
+import { makeCreatedEvent, makeUpdatedEvent, makeRestockedEvent, makeSoldEvent, makeRemovedEvent, makeVoidedEvent, makeCustomerRenamedEvent, makeCustomerRemovedEvent, makeDebtAddedEvent, makeDebtPaidEvent, makeExpenseAddedEvent, generateId } from '../types/events.js'
 import { useStore } from '../store/index.js'
 import { getConfig, queueSync } from './githubSync.js'
 
@@ -47,6 +47,12 @@ export const EventStore = {
   /** Hide the item from stock; its sales stay in history and reports. */
   removeItem(id) {
     this.append(makeRemovedEvent({ id }))
+  },
+
+  /** A general cost such as salary or rent. @returns {string} its id (for voidEntry) */
+  addExpense({ title, amount, note = '' }) {
+    const nt = note.trim()
+    return this.append(makeExpenseAddedEvent({ title: title.trim(), amount, ...(nt && { note: nt }) }))
   },
 
   /** A debt without a purchase. @returns {string} its id */

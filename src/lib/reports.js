@@ -1,4 +1,4 @@
-// Daily / weekly / monthly (Jalali) report buckets from the derived sales.
+// Daily / weekly / monthly (Jalali) report buckets from the derived sales and general expenses.
 const jalaliParts = new Intl.DateTimeFormat('en-u-ca-persian', { year: 'numeric', month: 'numeric', day: 'numeric' })
 const dayLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { day: 'numeric', month: 'long' })
 const monthLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { month: 'long', year: 'numeric' })
@@ -21,7 +21,7 @@ export function bucketOf(ts, period) {
   return { key: String(+day), label: dayLabel.format(day) }
 }
 
-const empty = () => ({ revenue: 0, cogs: 0, profit: 0, units: 0, byItem: {} })
+const empty = () => ({ revenue: 0, cogs: 0, profit: 0, expenses: 0, units: 0, byItem: {} })
 
 function addSale(b, s) {
   b.revenue += s.revenue
@@ -34,8 +34,8 @@ function addSale(b, s) {
   it.profit += s.profit
 }
 
-/** Chronological buckets (only periods with activity) plus overall totals. */
-export function buildReport(sales, period) {
+/** Chronological buckets (only periods with activity) plus overall totals. `expenses` = general costs. */
+export function buildReport(sales, period, expenses = []) {
   const map = new Map()
   const bucket = (ts) => {
     const { key, label } = bucketOf(ts, period)
@@ -46,9 +46,12 @@ export function buildReport(sales, period) {
   }
   const totals = empty()
   for (const s of sales) { addSale(bucket(s.ts), s); addSale(totals, s) }
+  for (const e of expenses) { bucket(e.ts).expenses += e.amount; totals.expenses += e.amount }
   const buckets = [...map.values()].sort((a, b) => a.ts - b.ts)
   return { buckets, totals }
 }
 
+/** Net profit: profit on sales minus general expenses. */
+export const net = (b) => b.profit - b.expenses
 export const margin = (b) => (b.revenue ? (b.profit / b.revenue) * 100 : 0)
 export const topItems = (b, count = 5) => Object.values(b.byItem).sort((a, c) => c.profit - a.profit).slice(0, count)

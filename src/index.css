@@ -410,3 +410,8 @@ input::placeholder { color: var(--muted); opacity: 0.8; }
   .stats.debts { grid-template-columns: 2fr 1fr 1fr; }
   .stats.debts .stat:first-child { grid-column: auto; }
 }
+
+/* ---------- expenses + hero stats ---------- */
+.stats.hero .stat:first-child { grid-column: 1 / -1; }
+.stats.expenses { grid-template-columns: 1fr 1fr; }
+.wide-btn { width: 100%; margin-bottom: 14px; }

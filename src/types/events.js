@@ -10,6 +10,7 @@ const Events = {
   CUSTOMER_REMOVED: 'customer.removed',
   DEBT_ADDED: 'debt.added',
   DEBT_PAID: 'debt.paid',
+  EXPENSE_ADDED: 'expense.added',
 }
 
 // random UUID: unique across devices and sessions
@@ -98,7 +99,13 @@ function makeDebtPaidEvent(payload) {
   return { op: Events.DEBT_PAID, data: [payload], timestamp: Date.now() }
 }
 
+/** A general cost (salary, rent, bills...), not tied to an item. Voidable like a sale.
+ * @param {{ title: string, amount: number, note?: string }} payload */
+function makeExpenseAddedEvent(payload) {
+  return { op: Events.EXPENSE_ADDED, data: [payload], timestamp: Date.now() }
+}
+
 export {
   Events, generateId, makeCreatedEvent, makeUpdatedEvent, makeRestockedEvent, makeSoldEvent, makeRemovedEvent, makeVoidedEvent,
-  makeCustomerRenamedEvent, makeCustomerRemovedEvent, makeDebtAddedEvent, makeDebtPaidEvent,
+  makeCustomerRenamedEvent, makeCustomerRemovedEvent, makeDebtAddedEvent, makeDebtPaidEvent, makeExpenseAddedEvent,
 }

@@ -11,6 +11,7 @@ A small coffee-shop manager, in Persian (RTL, Jalali dates, تومان), usable 
 - **Profit:** each sale remembers the price and cost it was made at, so editing prices or cost later never rewrites old profit.
 - **Detailed sell** ("جزئیات" beside Sell): count, optional note and customer name. Names are saved automatically as customers (matched ignoring ي/ی, ك/ک and spacing), suggested in a dropdown while typing, and listed with totals in the Customers tab. Each customer has a full purchase view (price, cost, profit, notes), rename (renaming to an existing name merges the two; the name changes in all their past sales) and delete (the name is removed from their sales; the sales stay in history and reports).
 - **Debts (نسیه):** in the sell form, "paid amount" defaults to the full total; paying less records the rest as that customer's debt (a customer name is then required). Every debt is its own record with partial payments and a payment history; the 💳 tab lists them (open / settled), a debt can also be added by hand without a purchase, and each customer has a total debt report. Profit is still counted when the sale is made, not when it is paid. "فروش سریع" is the one-tap sale, always paid in full.
+- **General expenses:** salary, rent, bills... as title + amount + note (History tab, "هزینه‌ها"). Titles are remembered and suggested in a dropdown as you type, like customers. Reports show net profit = profit on sales minus these expenses; deleting an expense takes it out again.
 - **History:** every sale, newest first, with the customer name and a button to read the sale's note. A sale or restock done by mistake can be undone right away (toast) or deleted from the history later; removing an item keeps its sales.
 - **Reports:** daily / weekly (Saturday start) / monthly (Jalali) sales, production cost, profit, margin, top items, plus all-time totals.
 
@@ -56,4 +57,4 @@ To test sync locally, open two different browser profiles (each has its own `loc
 - Title/price/cost edits use last-write-wins by timestamp, so a badly wrong phone clock can win.
 - The data repo must be private; the setup screen refuses a public one.
 - Clearing a phone's site data loses its unsynced events and gives it a new device id.
-- `localStorage` (~5MB) holds the log; move to IndexedDB if a shop outgrows it.
+- The log is stored in IndexedDB (data from older versions in `localStorage` is moved there automatically on first use).

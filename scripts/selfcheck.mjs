@@ -1,7 +1,7 @@
 // node scripts/selfcheck.mjs — checks the merge/replay and report logic every device relies on
 import assert from 'node:assert/strict'
 import { replay } from '../src/lib/reduce.js'
-import { buildReport, bucketOf } from '../src/lib/reports.js'
+import { buildReport, bucketOf, net } from '../src/lib/reports.js'
 import { toNum, normName } from '../src/lib/format.js'
 
 const ev = (id, device, timestamp, op, payload) => ({ id, device, timestamp, op, data: [payload] })
@@ -160,6 +160,32 @@ const ren = replay([...debtBase, ev('rn1', 'A', 6, 'customer.renamed', { from: '
 assert.deepEqual([ren.debts[0].customer, ren.customers.find((c) => c.name === 'سارا م').debt], ['سارا م', 10])
 const rem = replay([...debtBase, ev('rm1', 'A', 6, 'customer.removed', { name: 'سارا' })])
 assert.deepEqual([rem.debts[0].customer, rem.customers.map((c) => c.name)], ['', ['علی']])
+
+// general expenses: listed in time order, titles remembered (normalized, latest spelling), voidable
+const exp = (id, ts, title, amount, note) => ev(id, 'A', ts, 'expense.added', { title, amount, ...(note && { note }) })
+const costs = replay([
+  created,
+  exp('x1', 2, 'حقوق  کارمند', 5000000, 'مهر'),
+  exp('x2', 3, 'اجاره', 8000000),
+  exp('x3', 4, 'حقوق کارمند', 5200000), // same title, ZWNJ/space-insensitive: one remembered title
+  exp('x4', 5, '  ', 100),             // blank title: ignored
+  exp('x5', 6, 'قبض', 0),              // zero amount: ignored
+])
+assert.deepEqual(costs.expenses.map((e) => [e.id, e.amount, e.note]), [['x1', 5000000, 'مهر'], ['x2', 8000000, ''], ['x3', 5200000, '']])
+assert.deepEqual(costs.expenseTitles.map((t) => [t.name, t.count, t.total]), [['حقوق کارمند', 2, 10200000], ['اجاره', 1, 8000000]])
+const voidedCost = replay([created, exp('x1', 2, 'اجاره', 8000000), ev('xv', 'A', 3, 'history.voided', { id: 'x1' })])
+assert.deepEqual([voidedCost.expenses, voidedCost.expenseTitles], [[], []]) // voiding the only use drops the title too
+assert.deepEqual(replay([created]).expenses, []) // old logs: nothing changes
+// expenses lower the net profit per period and in total; a period with only expenses still shows up
+const t1 = new Date(2026, 9, 17, 12).getTime()
+const rep2 = buildReport(
+  [{ id: 'a', ts: t1, itemId: 'latte', title: 'Latte', qty: 2, price: 10, cost: 4, revenue: 20, profit: 12 }],
+  'day',
+  [{ id: 'e1', ts: t1 + 3600_000, title: 'اجاره', amount: 5 }, { id: 'e2', ts: t1 + 3 * DAY, title: 'برق', amount: 7 }],
+)
+assert.deepEqual(rep2.buckets.map((b) => [b.revenue, b.profit, b.expenses, net(b)]), [[20, 12, 5, 7], [0, 0, 7, -7]])
+assert.deepEqual([rep2.totals.profit, rep2.totals.expenses, net(rep2.totals)], [12, 12, 0])
+assert.equal(buildReport([], 'day').totals.expenses, 0)
 
 // typed numbers: Persian/Arabic digits and separators
 assert.equal(toNum('۲۰٬۰۰۰'), 20000)

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { idbStorage } from '../lib/idbStorage.js'
 import { replay } from '../lib/reduce.js'
 
 /**
@@ -13,6 +14,8 @@ export const useStore = create(
       sales: [],      // derived: every sale with the price/cost it was made at (+ customer, note)
       customers: [],  // derived: one entry per customer name with totals, newest purchase first
       debts: [],      // derived: every open/settled debt with its payments
+      expenses: [],   // derived: general costs (title, amount, note), in time order
+      expenseTitles: [], // derived: remembered titles for the dropdown, newest first
       logs: [],    // every known event, local and pulled
       pushed: [],  // ids of own events already in the data repo
 
@@ -33,6 +36,7 @@ export const useStore = create(
     }),
     {
       name: 'coffeepeer-store',
+      storage: createJSONStorage(() => idbStorage), // async: App waits for hydration before rendering/syncing
       partialize: ({ logs, pushed }) => ({ logs, pushed }),
       merge: (persisted, current) => ({
         ...current,

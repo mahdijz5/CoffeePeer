@@ -3,14 +3,16 @@ import { EventStore } from '../services/eventStore.js'
 import { useStore } from '../store/index.js'
 import { fmtNum, fmtMoney, fmtDateTime } from '../lib/format.js'
 import ItemAvatar from './ItemAvatar.jsx'
+import Expenses from './Expenses.jsx'
 
 const PAGE = 40
 
-/** Sales history, newest first. Deleting a row cancels that sale (stock back, profit removed). */
+/** Sales history (newest first) or general expenses. Deleting a sale row cancels it (stock back, profit removed). */
 export default function History() {
   const sales = useStore((s) => s.sales)
   const items = useStore((s) => s.items)
   const [shown, setShown] = useState(PAGE)
+  const [kind, setKind] = useState('sales') // 'sales' | 'expenses'
   const [openNotes, setOpenNotes] = useState(() => new Set()) // sale ids whose note is expanded
   const toggleNote = (id) => setOpenNotes((s) => { const n = new Set(s); if (!n.delete(id)) n.add(id); return n })
 
@@ -20,11 +22,20 @@ export default function History() {
     if (confirm(`فروش «${r.title}» حذف شود؟\nموجودی برمی‌گردد و از سود و گزارش‌ها کم می‌شود.`)) EventStore.voidEntry(r.id)
   }
 
-  if (rows.length === 0) return <p className="muted center">هنوز فروشی ثبت نشده.</p>
+  const switcher = (
+    <div className="seg" role="tablist">
+      {[['sales', 'فروش‌ها'], ['expenses', 'هزینه‌ها']].map(([k, label]) => (
+        <button key={k} role="tab" aria-selected={kind === k} onClick={() => setKind(k)}>{label}</button>
+      ))}
+    </div>
+  )
+
+  if (kind === 'expenses') return <section>{switcher}<Expenses /></section>
+  if (rows.length === 0) return <section>{switcher}<p className="muted center">هنوز فروشی ثبت نشده.</p></section>
 
   return (
     <section>
-      <h2 className="sect">تاریخچه فروش</h2>
+      {switcher}
       <div className="rows">
         {rows.slice(0, shown).map((r, i) => (
           <article key={r.id} className="rowcard" style={{ '--i': Math.min(i, 12) }}>
