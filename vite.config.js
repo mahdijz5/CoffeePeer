@@ -10,8 +10,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'CoffeePeer',
-        short_name: 'CoffeePeer',
+        name: 'کافی‌پیر',
+        short_name: 'کافی‌پیر',
+        lang: 'fa',
+        dir: 'rtl',
         theme_color: '#6f4e37',
         background_color: '#ffffff',
         display: 'standalone',

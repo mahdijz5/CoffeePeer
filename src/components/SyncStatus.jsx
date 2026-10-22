@@ -1,5 +1,6 @@
 import { useStore } from '../store/index.js'
 import { useSync, getConfig, sync } from '../services/githubSync.js'
+import { fmtNum, fmtTime } from '../lib/format.js'
 import Logo from './Logo.jsx'
 
 export default function SyncStatus({ onSettings }) {
@@ -11,23 +12,23 @@ export default function SyncStatus({ onSettings }) {
   })
 
   const label =
-    status === 'syncing' ? 'Syncing…'
-    : status === 'error' ? `Sync failed: ${error}`
-    : lastSynced ? `Synced ${new Date(lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : 'Not synced yet'
-  const text = `${label}${pending > 0 ? ` · ${pending} pending` : ''}`
+    status === 'syncing' ? 'در حال همگام‌سازی…'
+    : status === 'error' ? `همگام‌سازی ناموفق: ${error}`
+    : lastSynced ? `همگام شد ${fmtTime(lastSynced)}`
+    : 'هنوز همگام نشده'
+  const text = `${label}${pending > 0 ? ` · ${fmtNum(pending)} در انتظار` : ''}`
 
   return (
     <header className="topbar">
       <div className="brand">
         <Logo />
-        <h1>CoffeePeer</h1>
+        <h1>کافی‌پیر</h1>
       </div>
       <div className="pill" data-status={status} title={text}>
         <span className="dot" />
         <span className="pill-text">{text}</span>
-        <button className={`icon-btn ${status === 'syncing' ? 'spin' : ''}`} onClick={sync} disabled={status === 'syncing'} title="Sync now" aria-label="Sync now">⟳</button>
-        <button className="icon-btn" onClick={onSettings} title="Settings" aria-label="Settings">⚙</button>
+        <button className={`icon-btn ${status === 'syncing' ? 'spin' : ''}`} onClick={sync} disabled={status === 'syncing'} title="همگام‌سازی اکنون" aria-label="همگام‌سازی اکنون">⟳</button>
+        <button className="icon-btn" onClick={onSettings} title="تنظیمات" aria-label="تنظیمات">⚙</button>
       </div>
     </header>
   )

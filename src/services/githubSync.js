@@ -9,7 +9,8 @@ import { useStore } from '../store/index.js'
 const API = 'https://api.github.com'
 const CFG_KEY = 'coffeepeer-config'
 const SHA_KEY = 'coffeepeer-shas'
-const INTERVAL_MS = 60_000
+const INTERVAL_MS = 60_000 // pull (and push leftovers) this often
+const PUSH_QUIET_MS = 5_000 // push once the user has made no change for this long
 
 /** UI-facing sync state */
 export const useSync = create(() => ({ status: 'idle', lastSynced: null, error: null }))
@@ -39,8 +40,8 @@ export async function saveConfig({ repo, token }) {
   const res = await fetch(`${API}/repos/${repo}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
-  if (!res.ok) throw new Error(`GitHub ${res.status}: check repo name and token`)
-  if (!(await res.json()).private) throw new Error('That repo is public, so everyone could read your sales data. Use a private repo.')
+  if (!res.ok) throw new Error(`GitHub ${res.status}: نام مخزن و توکن را بررسی کنید`)
+  if (!(await res.json()).private) throw new Error('این مخزن عمومی است و همه می‌توانند داده‌های فروش را ببینند. از یک مخزن خصوصی استفاده کنید.')
   const prev = getConfig()
   if (prev?.repo !== repo) {
     // new data repo: re-push own events there and forget the old repo's file shas
@@ -61,13 +62,13 @@ const parseLines = (text) =>
 async function pushMonth(path, events) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const cur = await gh(`/contents/${path}`)
-    if (cur.status !== 404 && !cur.ok) throw new Error(`GitHub ${cur.status} reading ${path}`)
+    if (cur.status !== 404 && !cur.ok) throw new Error(`GitHub ${cur.status} هنگام خواندن ${path}`)
     const file = cur.ok ? await cur.json() : null
     let text = file?.content ? b64dec(file.content) : ''
     if (file && !text && file.size) {
       // Contents API omits inline content above 1MB (icons make big files likelier): read it raw
       const raw = await gh(`/contents/${path}`, { raw: true })
-      if (!raw.ok) throw new Error(`GitHub ${raw.status} reading ${path}`)
+      if (!raw.ok) throw new Error(`GitHub ${raw.status} هنگام خواندن ${path}`)
       text = await raw.text()
     }
     const have = new Set(parseLines(text).map((e) => e.id))
@@ -79,11 +80,11 @@ async function pushMonth(path, events) {
         body: { message: `events ${path}`, content: b64enc(next), sha: file?.sha },
       })
       if (res.status === 409 || res.status === 422) continue // stale sha, re-read and retry
-      if (!res.ok) throw new Error(`GitHub ${res.status} writing ${path}`)
+      if (!res.ok) throw new Error(`GitHub ${res.status} هنگام نوشتن ${path}`)
     }
     return
   }
-  throw new Error(`Gave up writing ${path} after 3 conflicts`)
+  throw new Error(`نوشتن ${path} پس از ۳ تلاش ناموفق بود`)
 }
 
 async function push() {
@@ -103,7 +104,7 @@ async function push() {
 async function list(path) {
   const res = await gh(`/contents/${path}`)
   if (res.status === 404) return []
-  if (!res.ok) throw new Error(`GitHub ${res.status} listing ${path}`)
+  if (!res.ok) throw new Error(`GitHub ${res.status} هنگام خواندن فهرست ${path}`)
   return res.json()
 }
 
@@ -113,7 +114,7 @@ async function pull() {
     for (const f of await list(dir.path)) {
       if (shas[f.path] === f.sha) continue // unchanged since last pull
       const res = await gh(`/contents/${f.path}`, { raw: true })
-      if (!res.ok) throw new Error(`GitHub ${res.status} reading ${f.path}`)
+      if (!res.ok) throw new Error(`GitHub ${res.status} هنگام خواندن ${f.path}`)
       useStore.getState().addEvents(parseLines(await res.text()))
       shas[f.path] = f.sha
       localStorage.setItem(SHA_KEY, JSON.stringify(shas))
@@ -123,10 +124,24 @@ async function pull() {
 
 let running = null
 let again = false
+let pushTimer = null
+
+/**
+ * Called after every local change. Debounced: each change restarts the wait, so a burst of
+ * edits becomes one push (one commit) PUSH_QUIET_MS after the last one.
+ * ponytail: constant editing postpones the push; the 60s timer in startSync still pushes pending events.
+ */
+export function queueSync() {
+  if (!getConfig()) return
+  clearTimeout(pushTimer)
+  pushTimer = setTimeout(() => { pushTimer = null; sync() }, PUSH_QUIET_MS)
+}
 
 /** Push own events, then pull everyone's. Calls during a run schedule one more run. */
 export function sync() {
   if (!getConfig()) return
+  clearTimeout(pushTimer) // a queued push is covered by this run
+  pushTimer = null
   if (running) { again = true; return running }
   useSync.setState({ status: 'syncing' })
   running = (async () => {
@@ -135,7 +150,8 @@ export function sync() {
       await pull()
       useSync.setState({ status: 'idle', lastSynced: Date.now(), error: null })
     } catch (e) {
-      useSync.setState({ status: 'error', error: e.message })
+      const error = e instanceof TypeError ? 'اتصال به GitHub برقرار نشد (اینترنت یا VPN را بررسی کنید)' : e.message
+      useSync.setState({ status: 'error', error })
     } finally {
       running = null
       if (again) { again = false; sync() }
@@ -144,9 +160,9 @@ export function sync() {
   return running
 }
 
-/** Sync now, then every minute and whenever the app regains focus or network. Returns a stop fn. */
+/** Sync now, then every minute and whenever the app is hidden/shown or regains network. Returns a stop fn. */
 export function startSync() {
-  const onVisible = () => document.visibilityState === 'visible' && sync()
+  const onVisible = () => sync() // hidden: flush pending changes before the phone suspends the page; visible: catch up
   sync()
   const timer = setInterval(sync, INTERVAL_MS)
   window.addEventListener('online', sync)

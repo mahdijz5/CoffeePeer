@@ -9,7 +9,10 @@ import { replay } from '../lib/reduce.js'
 export const useStore = create(
   persist(
     (set) => ({
-      items: {},   // { [id]: { id, title, price, stock } }
+      items: {},      // derived: { [id]: { id, title, price, cost, stock, icon, sold, revenue, profit } }
+      sales: [],      // derived: every sale with the price/cost it was made at (+ customer, note)
+      customers: [],  // derived: one entry per customer name with totals, newest purchase first
+      debts: [],      // derived: every open/settled debt with its payments
       logs: [],    // every known event, local and pulled
       pushed: [],  // ids of own events already in the data repo
 
@@ -20,7 +23,7 @@ export const useStore = create(
           const fresh = events.filter((e) => !known.has(e.id))
           if (!fresh.length) return state
           const logs = [...state.logs, ...fresh]
-          return { logs, items: replay(logs) }
+          return { logs, ...replay(logs) }
         })
       },
 
@@ -34,7 +37,7 @@ export const useStore = create(
       merge: (persisted, current) => ({
         ...current,
         ...persisted,
-        items: replay(persisted?.logs || []),
+        ...replay(persisted?.logs || []),
       }),
     },
   ),
